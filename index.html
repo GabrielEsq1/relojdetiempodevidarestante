@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reloj de Arena Vida Restante</title>
+<style>
+  :root {
+    --sand-primary: #ff7e5f;
+    --sand-secondary: #feb47b;
+  }
+
+  body {
+    margin: 0;
+    font-family: 'Roboto', sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #1a1a2e, #16213e); /* Color más elegante */
+    color: #fff;
+  }
+
+  .container-glass {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 25px;
+    padding: 30px;
+    text-align: center;
+    width: 380px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+  }
+
+  input, select, button {
+    width: 90%;
+    padding: 12px;
+    margin: 8px 0;
+    border-radius: 12px;
+    border: none;
+    outline: none;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+  }
+
+  button {
+    cursor: pointer;
+    font-weight: bold;
+    background: var(--sand-primary);
+    transition: 0.3s;
+    margin-top: 15px;
+  }
+
+  button:hover { background: var(--sand-secondary); transform: scale(1.02); }
+
+  /* --- RELOJ DE ARENA 3D MINIMAL --- */
+  .hourglass-container {
+    position: relative;
+    width: 120px;
+    height: 180px;
+    margin: 30px auto;
+  }
+
+  .glass-body {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    /* Crea la forma de reloj de arena real */
+    clip-path: polygon(0% 0%, 100% 0%, 100% 5%, 55% 50%, 100% 95%, 100% 100%, 0% 100%, 0% 95%, 45% 50%, 0% 5%);
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    z-index: 2;
+  }
+
+  .sand-top {
+    position: absolute;
+    top: 5px;
+    left: 10%;
+    width: 80%;
+    height: 43%;
+    background: linear-gradient(to bottom, var(--sand-primary), var(--sand-secondary));
+    clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
+    transform-origin: bottom;
+    transition: transform 1s ease-in-out;
+  }
+
+  .sand-bottom {
+    position: absolute;
+    bottom: 5px;
+    left: 10%;
+    width: 80%;
+    height: 43%;
+    background: linear-gradient(to top, var(--sand-primary), var(--sand-secondary));
+    clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+    transform: scaleY(0);
+    transform-origin: bottom;
+    transition: transform 1s ease-in-out;
+  }
+
+  .stream {
+    position: absolute;
+    top: 48%;
+    left: 50%;
+    width: 3px;
+    height: 48%;
+    background: var(--sand-secondary);
+    transform: translateX(-50%);
+    display: none;
+    z-index: 1;
+    animation: drip 1s infinite linear;
+  }
+
+  @keyframes drip {
+    0% { opacity: 0.5; }
+    50% { opacity: 1; }
+    100% { opacity: 0.5; }
+  }
+
+  /* --- RESULTADOS --- */
+  .results { margin-top: 25px; }
+  .time-text { font-size: 0.9rem; opacity: 0.9; margin: 4px 0; }
+  #main-seconds { font-size: 1.8rem; font-weight: bold; color: var(--sand-secondary); margin: 10px 0; }
+
+  .progress-container {
+    background: rgba(255,255,255,0.1);
+    border-radius: 20px;
+    height: 10px;
+    margin: 20px 0;
+    overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%;
+    width: 0%;
+    background: var(--sand-primary);
+    transition: width 1s;
+  }
+
+  .motivacion { font-style: italic; color: var(--sand-secondary); margin-top: 15px; }
+</style>
+</head>
+<body>
+
+<div class="container-glass">
+  <h1>Vida Restante</h1>
+  <input type="date" id="birthdate">
+  <select id="country">
+    <option value="co">Colombia (77 años)</option>
+    <option value="us">EE.UU. (79 años)</option>
+    <option value="jp">Japón (84 años)</option>
+    <option value="de">Alemania (81 años)</option>
+  </select>
+  <button onclick="iniciarCalculo()">CALCULAR TIEMPO</button>
+
+  <div class="results" id="results" style="display:none;">
+    
+    <div class="hourglass-container">
+      <div class="glass-body"></div>
+      <div class="sand-top" id="sandTop"></div>
+      <div class="stream" id="stream"></div>
+      <div class="sand-bottom" id="sandBottom"></div>
+    </div>
+
+    <div id="main-seconds"></div>
+    <div class="time-text" id="years"></div>
+    <div class="time-text" id="days"></div>
+    <div class="time-text" id="weeks"></div>
+
+    <div class="progress-container">
+      <div class="progress-bar" id="progress"></div>
+    </div>
+    <div class="motivacion" id="motivacion"></div>
+  </div>
+</div>
+
+<script>
+const esperanzas = { 'co': 77, 'us': 79, 'jp': 84, 'de': 81 };
+let timerInterval;
+
+function formatNumber(num) {
+  return num.toLocaleString('es-CO');
+}
+
+function iniciarCalculo() {
+  if (timerInterval) clearInterval(timerInterval);
+  actualizarVista();
+  timerInterval = setInterval(actualizarVista, 1000);
+  document.getElementById('results').style.display = 'block';
+}
+
+function actualizarVista() {
+  const birthValue = document.getElementById('birthdate').value;
+  if (!birthValue) return alert('Selecciona tu fecha');
+
+  const birthdate = new Date(birthValue);
+  const country = document.getElementById('country').value;
+  const hoy = new Date();
+  const esperanzaAños = esperanzas[country];
+  
+  const edadMilisegundos = hoy - birthdate;
+  const esperanzaMilisegundos = esperanzaAños * 365.25 * 24 * 60 * 60 * 1000;
+  const restanteMilisegundos = esperanzaMilisegundos - edadMilisegundos;
+
+  if (restanteMilisegundos <= 0) {
+    document.getElementById('main-seconds').innerText = "¡Viviendo tiempo extra!";
+    return;
+  }
+
+  // Cálculos
+  const segundosTotales = Math.floor(restanteMilisegundos / 1000);
+  const años = Math.floor(segundosTotales / (365.25 * 24 * 3600));
+  const dias = Math.floor(segundosTotales / (24 * 3600));
+  const semanas = Math.floor(dias / 7);
+
+  // Actualizar Interfaz
+  document.getElementById('main-seconds').innerText = formatNumber(segundosTotales) + " seg";
+  document.getElementById('years').innerText = `Años restantes: ${formatNumber(años)}`;
+  document.getElementById('days').innerText = `Días totales: ${formatNumber(dias)}`;
+  document.getElementById('weeks').innerText = `Semanas: ${formatNumber(semanas)}`;
+
+  // Animación Reloj
+  const porcentajeVidaPasada = edadMilisegundos / esperanzaMilisegundos;
+  document.getElementById('sandTop').style.transform = `scaleY(${Math.max(0, 1 - porcentajeVidaPasada)})`;
+  document.getElementById('sandBottom').style.transform = `scaleY(${Math.min(1, porcentajeVidaPasada)})`;
+  document.getElementById('stream').style.display = 'block';
+  
+  // Barra progreso
+  document.getElementById('progress').style.width = `${porcentajeVidaPasada * 100}%`;
+
+  // Frase (solo la primera vez)
+  if(!document.getElementById('motivacion').innerText) {
+      const frases = ["Haz que cada segundo cuente", "El momento es ahora", "No dejes para mañana...", "Tu tiempo es oro"];
+      document.getElementById('motivacion').innerText = frases[Math.floor(Math.random()*frases.length)];
+  }
+}
+</script>
+</body>
+</html>
